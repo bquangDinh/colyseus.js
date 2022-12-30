@@ -1,3 +1,4 @@
+// colyseus.js@0.14.14
 /**
  * Copyright (c) 2014 Ion Drive Software Ltd.
  * https://github.com/darrachequesne/notepack/
@@ -20,7 +21,6 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
 /**
  * Patch for Colyseus:
  * -------------------
@@ -28,24 +28,23 @@
  * added `offset` on Decoder constructor, for messages arriving with a code
  * before actual msgpack data
  */
-
 //
 // DECODER
 //
-
 function Decoder(buffer, offset) {
     this._offset = offset;
     if (buffer instanceof ArrayBuffer) {
         this._buffer = buffer;
         this._view = new DataView(this._buffer);
-    } else if (ArrayBuffer.isView(buffer)) {
+    }
+    else if (ArrayBuffer.isView(buffer)) {
         this._buffer = buffer.buffer;
         this._view = new DataView(this._buffer, buffer.byteOffset, buffer.byteLength);
-    } else {
+    }
+    else {
         throw new Error('Invalid argument');
     }
 }
-
 function utf8Read(view, offset, length) {
     var string = '', chr = 0;
     for (var i = offset, end = offset + length; i < end; i++) {
@@ -55,18 +54,14 @@ function utf8Read(view, offset, length) {
             continue;
         }
         if ((byte & 0xe0) === 0xc0) {
-            string += String.fromCharCode(
-                ((byte & 0x1f) << 6) |
-                (view.getUint8(++i) & 0x3f)
-            );
+            string += String.fromCharCode(((byte & 0x1f) << 6) |
+                (view.getUint8(++i) & 0x3f));
             continue;
         }
         if ((byte & 0xf0) === 0xe0) {
-            string += String.fromCharCode(
-                ((byte & 0x0f) << 12) |
+            string += String.fromCharCode(((byte & 0x0f) << 12) |
                 ((view.getUint8(++i) & 0x3f) << 6) |
-                ((view.getUint8(++i) & 0x3f) << 0)
-            );
+                ((view.getUint8(++i) & 0x3f) << 0));
             continue;
         }
         if ((byte & 0xf8) === 0xf0) {
@@ -77,7 +72,8 @@ function utf8Read(view, offset, length) {
             if (chr >= 0x010000) { // surrogate pair
                 chr -= 0x010000;
                 string += String.fromCharCode((chr >>> 10) + 0xD800, (chr & 0x3FF) + 0xDC00);
-            } else {
+            }
+            else {
                 string += String.fromCharCode(chr);
             }
             continue;
@@ -86,7 +82,6 @@ function utf8Read(view, offset, length) {
     }
     return string;
 }
-
 Decoder.prototype._array = function (length) {
     var value = new Array(length);
     for (var i = 0; i < length; i++) {
@@ -94,7 +89,6 @@ Decoder.prototype._array = function (length) {
     }
     return value;
 };
-
 Decoder.prototype._map = function (length) {
     var key = '', value = {};
     for (var i = 0; i < length; i++) {
@@ -103,23 +97,19 @@ Decoder.prototype._map = function (length) {
     }
     return value;
 };
-
 Decoder.prototype._str = function (length) {
     var value = utf8Read(this._view, this._offset, length);
     this._offset += length;
     return value;
 };
-
 Decoder.prototype._bin = function (length) {
     var value = this._buffer.slice(this._offset, this._offset + length);
     this._offset += length;
     return value;
 };
-
 Decoder.prototype._parse = function () {
     var prefix = this._view.getUint8(this._offset++);
     var value, length = 0, type = 0, hi = 0, lo = 0;
-
     if (prefix < 0xc0) {
         // positive fixint
         if (prefix < 0x80) {
@@ -136,12 +126,10 @@ Decoder.prototype._parse = function () {
         // fixstr
         return this._str(prefix & 0x1f);
     }
-
     // negative fixint
     if (prefix > 0xdf) {
         return (0xff - prefix + 1) * -1;
     }
-
     switch (prefix) {
         // nil
         case 0xc0:
@@ -152,7 +140,6 @@ Decoder.prototype._parse = function () {
         // true
         case 0xc3:
             return true;
-
         // bin
         case 0xc4:
             length = this._view.getUint8(this._offset);
@@ -166,7 +153,6 @@ Decoder.prototype._parse = function () {
             length = this._view.getUint32(this._offset);
             this._offset += 4;
             return this._bin(length);
-
         // ext
         case 0xc7:
             length = this._view.getUint8(this._offset);
@@ -183,7 +169,6 @@ Decoder.prototype._parse = function () {
             type = this._view.getInt8(this._offset + 4);
             this._offset += 5;
             return [type, this._bin(length)];
-
         // float
         case 0xca:
             value = this._view.getFloat32(this._offset);
@@ -193,7 +178,6 @@ Decoder.prototype._parse = function () {
             value = this._view.getFloat64(this._offset);
             this._offset += 8;
             return value;
-
         // uint
         case 0xcc:
             value = this._view.getUint8(this._offset);
@@ -212,7 +196,6 @@ Decoder.prototype._parse = function () {
             lo = this._view.getUint32(this._offset + 4);
             this._offset += 8;
             return hi + lo;
-
         // int
         case 0xd0:
             value = this._view.getInt8(this._offset);
@@ -231,7 +214,6 @@ Decoder.prototype._parse = function () {
             lo = this._view.getUint32(this._offset + 4);
             this._offset += 8;
             return hi + lo;
-
         // fixext
         case 0xd4:
             type = this._view.getInt8(this._offset);
@@ -263,7 +245,6 @@ Decoder.prototype._parse = function () {
             type = this._view.getInt8(this._offset);
             this._offset += 1;
             return [type, this._bin(16)];
-
         // str
         case 0xd9:
             length = this._view.getUint8(this._offset);
@@ -277,7 +258,6 @@ Decoder.prototype._parse = function () {
             length = this._view.getUint32(this._offset);
             this._offset += 4;
             return this._str(length);
-
         // array
         case 0xdc:
             length = this._view.getUint16(this._offset);
@@ -287,7 +267,6 @@ Decoder.prototype._parse = function () {
             length = this._view.getUint32(this._offset);
             this._offset += 4;
             return this._array(length);
-
         // map
         case 0xde:
             length = this._view.getUint16(this._offset);
@@ -298,10 +277,8 @@ Decoder.prototype._parse = function () {
             this._offset += 4;
             return this._map(length);
     }
-
     throw new Error('Could not parse');
 };
-
 function decode(buffer, offset = 0) {
     var decoder = new Decoder(buffer, offset);
     var value = decoder._parse();
@@ -310,11 +287,9 @@ function decode(buffer, offset = 0) {
     }
     return value;
 }
-
 //
 // ENCODER
 //
-
 function utf8Write(view, offset, str) {
     var c = 0;
     for (var i = 0, l = str.length; i < l; i++) {
@@ -341,7 +316,6 @@ function utf8Write(view, offset, str) {
         }
     }
 }
-
 function utf8Length(str) {
     var c = 0, length = 0;
     for (var i = 0, l = str.length; i < l; i++) {
@@ -362,13 +336,10 @@ function utf8Length(str) {
     }
     return length;
 }
-
 function _encode(bytes, defers, value) {
     var type = typeof value, i = 0, l = 0, hi = 0, lo = 0, length = 0, size = 0;
-
     if (type === 'string') {
         length = utf8Length(value);
-
         // fixstr
         if (length < 0x20) {
             bytes.push(length | 0xa0);
@@ -388,7 +359,8 @@ function _encode(bytes, defers, value) {
         else if (length < 0x100000000) {
             bytes.push(0xdb, length >> 24, length >> 16, length >> 8, length);
             size = 5;
-        } else {
+        }
+        else {
             throw new Error('String too long');
         }
         defers.push({ _str: value, _length: length, _offset: bytes.length });
@@ -396,14 +368,12 @@ function _encode(bytes, defers, value) {
     }
     if (type === 'number') {
         // TODO: encode to float 32?
-
         // float 64
         if (Math.floor(value) !== value || !isFinite(value)) {
             bytes.push(0xcb);
             defers.push({ _float: value, _length: 8, _offset: bytes.length });
             return 9;
         }
-
         if (value >= 0) {
             // positive fixnum
             if (value < 0x80) {
@@ -430,7 +400,8 @@ function _encode(bytes, defers, value) {
             lo = value >>> 0;
             bytes.push(0xcf, hi >> 24, hi >> 16, hi >> 8, hi, lo >> 24, lo >> 16, lo >> 8, lo);
             return 9;
-        } else {
+        }
+        else {
             // negative fixnum
             if (value >= -0x20) {
                 bytes.push(value);
@@ -464,10 +435,8 @@ function _encode(bytes, defers, value) {
             bytes.push(0xc0);
             return 1;
         }
-
         if (Array.isArray(value)) {
             length = value.length;
-
             // fixarray
             if (length < 0x10) {
                 bytes.push(length | 0x90);
@@ -482,7 +451,8 @@ function _encode(bytes, defers, value) {
             else if (length < 0x100000000) {
                 bytes.push(0xdd, length >> 24, length >> 16, length >> 8, length);
                 size = 5;
-            } else {
+            }
+            else {
                 throw new Error('Array too large');
             }
             for (i = 0; i < length; i++) {
@@ -490,7 +460,6 @@ function _encode(bytes, defers, value) {
             }
             return size;
         }
-
         // fixext 8 / Date
         if (value instanceof Date) {
             var time = value.getTime();
@@ -499,37 +468,35 @@ function _encode(bytes, defers, value) {
             bytes.push(0xd7, 0, hi >> 24, hi >> 16, hi >> 8, hi, lo >> 24, lo >> 16, lo >> 8, lo);
             return 10;
         }
-
         if (value instanceof ArrayBuffer) {
             length = value.byteLength;
-
             // bin 8
             if (length < 0x100) {
                 bytes.push(0xc4, length);
                 size = 2;
-            } else
-                // bin 16
-                if (length < 0x10000) {
-                    bytes.push(0xc5, length >> 8, length);
-                    size = 3;
-                } else
-                    // bin 32
-                    if (length < 0x100000000) {
-                        bytes.push(0xc6, length >> 24, length >> 16, length >> 8, length);
-                        size = 5;
-                    } else {
-                        throw new Error('Buffer too large');
-                    }
+            }
+            else 
+            // bin 16
+            if (length < 0x10000) {
+                bytes.push(0xc5, length >> 8, length);
+                size = 3;
+            }
+            else 
+            // bin 32
+            if (length < 0x100000000) {
+                bytes.push(0xc6, length >> 24, length >> 16, length >> 8, length);
+                size = 5;
+            }
+            else {
+                throw new Error('Buffer too large');
+            }
             defers.push({ _bin: value, _length: length, _offset: bytes.length });
             return size + length;
         }
-
         if (typeof value.toJSON === 'function') {
             return _encode(bytes, defers, value.toJSON());
         }
-
         var keys = [], key = '';
-
         var allKeys = Object.keys(value);
         for (i = 0, l = allKeys.length; i < l; i++) {
             key = allKeys[i];
@@ -538,7 +505,6 @@ function _encode(bytes, defers, value) {
             }
         }
         length = keys.length;
-
         // fixmap
         if (length < 0x10) {
             bytes.push(length | 0x80);
@@ -553,15 +519,14 @@ function _encode(bytes, defers, value) {
         else if (length < 0x100000000) {
             bytes.push(0xdf, length >> 24, length >> 16, length >> 8, length);
             size = 5;
-        } else {
+        }
+        else {
             throw new Error('Object too large');
         }
-
         for (i = 0; i < length; i++) {
             key = keys[i];
             size = size + _encode(bytes, defers, key) + _encode(bytes, defers, value[key]);
         }
-
         return size;
     }
     // false/true
@@ -576,25 +541,24 @@ function _encode(bytes, defers, value) {
     }
     throw new Error('Could not encode');
 }
-
 function encode(value) {
     var bytes = [];
     var defers = [];
     var size = _encode(bytes, defers, value);
     var buf = new ArrayBuffer(size);
     var view = new DataView(buf);
-
     var deferIndex = 0;
     var deferWritten = 0;
     var nextOffset = -1;
     if (defers.length > 0) {
         nextOffset = defers[0]._offset;
     }
-
     var defer, deferLength = 0, offset = 0;
     for (var i = 0, l = bytes.length; i < l; i++) {
         view.setUint8(deferWritten + i, bytes[i]);
-        if (i + 1 !== nextOffset) { continue; }
+        if (i + 1 !== nextOffset) {
+            continue;
+        }
         defer = defers[deferIndex];
         deferLength = defer._length;
         offset = deferWritten + nextOffset;
@@ -603,9 +567,11 @@ function encode(value) {
             for (var j = 0; j < deferLength; j++) {
                 view.setUint8(offset + j, bin[j]);
             }
-        } else if (defer._str) {
+        }
+        else if (defer._str) {
             utf8Write(view, offset, defer._str);
-        } else if (defer._float !== undefined) {
+        }
+        else if (defer._float !== undefined) {
             view.setFloat64(offset, defer._float);
         }
         deferIndex++;
@@ -617,4 +583,5 @@ function encode(value) {
     return buf;
 }
 
-export { encode, decode };
+export { decode, encode };
+//# sourceMappingURL=index.mjs.map
